@@ -24,7 +24,7 @@ import java.util.List;
 
 
 public class MyActivity extends Activity {
-
+    // some changes
     EditText txtName, txtAdress, txtEmail, txtPhone;
     ImageView imageViewContactImg;
     List<Contact> contacts = new ArrayList<Contact>();
