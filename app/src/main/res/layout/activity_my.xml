@@ -87,7 +87,7 @@
                     <Button
                         android:layout_width="200dp"
                         android:layout_height="60dp"
-                        android:text="Add Contact"
+                        android:text="@string/add_contact"
                         android:id="@+id/btnAdd"
                         android:layout_gravity="center_horizontal"
                         android:layout_marginTop="10dp"
