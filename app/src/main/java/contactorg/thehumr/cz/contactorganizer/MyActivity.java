@@ -2,14 +2,17 @@ package contactorg.thehumr.cz.contactorganizer;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.view.ContextMenu;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
@@ -20,11 +23,18 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 
 public class MyActivity extends Activity {
     // some changes
+    private static final int EDIT = 0, DELETE = 1;
+    public static final String SHAREDPREFERENCES_SET = "contactPrefs";
+    public static final String SHARED_PREF_CONTACT_NAME = "ContactName";
+    public static final String SHARED_PREF_CONTACT_TIME = "ContactTime";
+
+
     EditText txtName, txtAdress, txtEmail, txtPhone;
     ImageView imageViewContactImg;
     List<Contact> contacts = new ArrayList<Contact>();
@@ -32,6 +42,8 @@ public class MyActivity extends Activity {
     Button btnAdd;
     Uri imageURI = Uri.parse("android.resource://contactorg.thehumr.cz.contactorganizer/drawable/nouser.jpg");
     DatabaseHandler dbHandler;
+    int longClickedItemIndex;
+    ArrayAdapter<Contact> contactAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,8 +59,20 @@ public class MyActivity extends Activity {
 
         dbHandler = new DatabaseHandler(getApplicationContext());
 
+        registerForContextMenu(contactListView);
+        contactListView.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
+            @Override
+            public boolean onItemLongClick(AdapterView<?> adapterView, View view, int i, long l) {
+                longClickedItemIndex = i;
+                return false;
+            }
+        });
+
         setupTabHost();
         setupAddButton();
+
+        displayLastAddedContact();
+
 
         imageViewContactImg = (ImageView) findViewById(R.id.imgViewContactImage);
         imageViewContactImg.setOnClickListener(new View.OnClickListener() {
@@ -66,6 +90,63 @@ public class MyActivity extends Activity {
         populateList();
     }
 
+    private void displayLastAddedContact() {
+        String lastAddedContact = getLastAddedContact();
+        String lastAddedContactTime = getLastAddedContactTime();
+        String name = "Last added contact: " + lastAddedContact + ", " + lastAddedContactTime;
+
+        TextView textViewLastAddedContact = (TextView)findViewById(R.id.txtLastAddedContact);
+        textViewLastAddedContact.setText(name);
+    }
+
+
+    private String getLastAddedContact() {
+        SharedPreferences prefs = getSharedPreferences(SHAREDPREFERENCES_SET, MODE_PRIVATE);
+        String extractedText = prefs.getString(SHARED_PREF_CONTACT_NAME, "No contact recorded");
+        return extractedText;
+    }
+
+    private String getLastAddedContactTime() {
+        SharedPreferences prefs = getSharedPreferences(SHAREDPREFERENCES_SET, MODE_PRIVATE);
+        String extractedText = prefs.getString(SHARED_PREF_CONTACT_TIME, "");
+        return extractedText;
+    }
+
+    private void storeLastAddedContactToSharedPreferences(Contact contact){
+        String name = contact.getName();
+        String time = new Date().toString();
+
+        SharedPreferences prefs = getSharedPreferences(SHAREDPREFERENCES_SET, MODE_PRIVATE);
+        SharedPreferences.Editor editor = prefs.edit();
+        editor.putString(SHARED_PREF_CONTACT_NAME, name);
+        editor.putString(SHARED_PREF_CONTACT_TIME, time);
+        editor.commit();
+    }
+
+    public void onCreateContextMenu(ContextMenu menu, View view, ContextMenu.ContextMenuInfo menuInfo){
+        super.onCreateContextMenu(menu, view, menuInfo);
+
+        menu.setHeaderIcon(R.drawable.pencil_icon);
+        menu.setHeaderTitle("Contact Options");
+        menu.add(Menu.NONE, EDIT, menu.NONE, "Edit Contact");
+        menu.add(Menu.NONE, DELETE, menu.NONE, "Delete Contact");
+    }
+
+    public boolean onContextItemSelected(MenuItem item){
+        switch (item.getItemId()){
+            case EDIT:
+                // TODO editing a contact
+                break;
+            case DELETE:
+                dbHandler.deleteContact(contacts.get(longClickedItemIndex));
+                contacts.remove(longClickedItemIndex);
+                contactAdapter.notifyDataSetChanged();
+                break;
+        }
+
+        return super.onContextItemSelected(item);
+    }
+
     private void setupAddButton() {
         btnAdd = (Button) findViewById(R.id.btnAdd);
 
@@ -76,7 +157,12 @@ public class MyActivity extends Activity {
                 if (!contactExists(contact)){
                     dbHandler.createContact(contact);
                     contacts.add(contact);
+                    contactAdapter.notifyDataSetChanged();
                     Toast.makeText(getApplicationContext(), String.valueOf(txtName.getText()) +  " has been added to your Contacts!",Toast.LENGTH_SHORT).show();
+
+                    storeLastAddedContactToSharedPreferences(contact);
+                    displayLastAddedContact();
+
                     return;
                 }
                 Toast.makeText(getApplicationContext(), String.valueOf(txtName.getText()) + " already exists. Please use a different name.", Toast.LENGTH_SHORT).show();
@@ -139,8 +225,8 @@ public class MyActivity extends Activity {
     }
 
     private void populateList(){
-        ArrayAdapter<Contact> adapter = new ContactListAdapter();
-        contactListView.setAdapter(adapter);
+        contactAdapter = new ContactListAdapter();
+        contactListView.setAdapter(contactAdapter);
     }
 
     private class ContactListAdapter extends ArrayAdapter<Contact> {
